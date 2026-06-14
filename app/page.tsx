@@ -498,6 +498,7 @@ export default function Home() {
             >
               ☰
             </button>
+            
             Nexora😎
           </h1>
         </div>
