@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup, signOut } from "firebase/auth";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Message = {
   role: "user" | "assistant";
@@ -78,6 +79,14 @@ export default function Home() {
       createNewChat();
     }
   }, []);
+
+  const playSound = (soundType: "send" | "receive") => {
+    const audio = new Audio(
+      soundType === "send" ? "/send.mp3" : "/receive.mp3"
+    );
+    audio.volume = 0.5;
+    audio.play().catch(() => { });
+  };
 
   const loginWithGoogle = async () => {
     try {
@@ -222,6 +231,7 @@ export default function Home() {
   };
 
   const handleSend = async () => {
+    playSound("send");
     if (!input.trim()) return;
 
     const userMessage = input;
@@ -271,6 +281,7 @@ export default function Home() {
       const data = await response.json();
 
       await streamResponse(data.reply);
+      playSound("receive");
     } catch {
       setChats((prev) =>
         prev.map((chat) =>
@@ -382,11 +393,14 @@ export default function Home() {
     );
   }
   return (
-    <div className="flex h-screen bg-[#212121] text-white overflow-hidden">
+    <div className="flex h-screen text-white bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f]">
       {/* Sidebar */}
-      <div
-        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300
-  ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      <motion.div
+
+        initial={{ x: -100 }}
+        animate={{ x: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed md:static top-0 left-0 h-full w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
       >
         <div className="p-4">
           <button
@@ -479,7 +493,7 @@ export default function Home() {
           </button>
 
         </div>
-      </div>
+      </motion.div>
 
       {isSidebarOpen && (
         <div
@@ -490,79 +504,82 @@ export default function Home() {
 
       {/* Main Chat */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-[#0A0A0A]">
-        <div className="border-b border-gray-700 px-6 py-4">
+        <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between backdrop-blur-xl bg-white/5">
+          <button
+            className="md:hidden text-white text-2xl"
+            onClick={() => setIsSidebarOpen(true)}
+          >
+            ☰
+          </button>
           <h1 className="text-xl font-semibold">
-            <button
-              className="md:hidden text-white text-2xl"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              ☰
-            </button>
-            
             Nexora😎
           </h1>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto w-full max-w-3xl space-y-6">
-            {activeChat?.messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === "user"
-                  ? "justify-end"
-                  : "justify-start"
-                  }`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${message.role === "user"
-                    ? "bg-white text-black ml-auto"
-                    : "bg-[#1A1A1A] text-white border border-white/10"
+            <AnimatePresence>
+              {activeChat?.messages.map((message, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"
                     }`}
                 >
-                  <div className="mb-1 text-[11px] text-gray-400">
-                    {message.role === "user" ? "You" : "Nexora"}
-                  </div>
-
-                  {message.role === "assistant" ? (
-                    <div>
-                      <ReactMarkdown
-                        components={{
-                          code({ className, children }) {
-                            const match = /language-(\w+)/.exec(className || "");
-
-                            return match ? (
-                              <SyntaxHighlighter
-                                language={match[1]}
-                                style={oneDark}
-                              >
-                                {String(children).replace(/\n$/, "")}
-                              </SyntaxHighlighter>
-                            ) : (
-                              <code className="bg-gray-800 rounded px-1">
-                                {children}
-                              </code>
-                            );
-                          },
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-
-                      <button
-                        onClick={() => copyToClipboard(message.content)}
-                        className="mt-2 rounded bg-gray-700 px-3 py-1 text-sm hover:bg-gray-600"
-                      >
-                        Copy
-                      </button>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${message.role === "user"
+                      ? "bg-white text-black ml-auto"
+                      : "bg-[#1A1A1A] text-white border border-white/10"
+                      }`}
+                  >
+                    <div className="mb-1 text-[11px] text-gray-400">
+                      {message.role === "user" ? "You" : "Nexora"}
                     </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap">
-                      {message.content}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+
+                    {message.role === "assistant" ? (
+                      <div>
+                        <ReactMarkdown
+                          components={{
+                            code({ className, children }) {
+                              const match = /language-(\w+)/.exec(className || "");
+
+                              return match ? (
+                                <SyntaxHighlighter
+                                  language={match[1]}
+                                  style={oneDark}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                              ) : (
+                                <code className="bg-gray-800 rounded px-1">
+                                  {children}
+                                </code>
+                              );
+                            },
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+
+                        <button
+                          onClick={() => copyToClipboard(message.content)}
+                          className="mt-2 rounded bg-gray-700 px-3 py-1 text-sm hover:bg-gray-600"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
             {isTyping && (
               <div className="text-gray-400">
@@ -627,12 +644,14 @@ export default function Home() {
               className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition"
             />
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleSend}
-              className="rounded-xl bg-white text-black px-6 py-3 font-medium hover:bg-gray-200 active:scale-[0.98] transition"
+              className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-white font-medium"
             >
               Send
-            </button>
+            </motion.button>
           </div>
         </div>
       </div>
