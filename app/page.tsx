@@ -395,12 +395,9 @@ export default function Home() {
   return (
     <div className="flex h-screen text-white bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f]">
       {/* Sidebar */}
-      <motion.div
-
-        initial={{ x: -100 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.3 }}
-        className="fixed md:static top-0 left-0 h-full w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
+      <div
+        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300
+  ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="p-4">
           <button
@@ -493,7 +490,7 @@ export default function Home() {
           </button>
 
         </div>
-      </motion.div>
+      </div>
 
       {isSidebarOpen && (
         <div
