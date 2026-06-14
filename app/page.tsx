@@ -41,6 +41,8 @@ export default function Home() {
 
   const [user, setUser] = useState<any>(null);
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -381,8 +383,17 @@ export default function Home() {
   }
   return (
     <div className="flex h-screen bg-[#212121] text-white overflow-hidden">
+      <button
+        className="md:hidden text-white p-3"
+        onClick={() => setIsSidebarOpen(false)}
+      >
+        ✕
+      </button>
       {/* Sidebar */}
-      <div className="hidden md:flex w-64 flex-col bg-[#171717] border-r border-gray-700">
+      <div
+        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300
+  ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
         <div className="p-4">
           <button
             onClick={createNewChat}
@@ -404,7 +415,10 @@ export default function Home() {
 
             <div
               key={chat.id}
-              onClick={() => setActiveChatId(chat.id)}
+              onClick={() => {
+                setActiveChatId(chat.id);
+                setIsSidebarOpen(false);
+              }}
               className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition ${chat.id === activeChatId
                 ? "bg-gray-800"
                 : "hover:bg-gray-800/60"
@@ -473,6 +487,13 @@ export default function Home() {
         </div>
       </div>
 
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Chat */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-[#0A0A0A]">
         <div className="border-b border-gray-700 px-6 py-4">
@@ -480,6 +501,12 @@ export default function Home() {
             Nexora😎
           </h1>
         </div>
+        <button
+          className="md:hidden text-white text-2xl"
+          onClick={() => setIsSidebarOpen(true)}
+        >
+          ☰
+        </button>
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto w-full max-w-3xl space-y-6">
