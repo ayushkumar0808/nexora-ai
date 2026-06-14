@@ -7,7 +7,7 @@ It supports real-time AI chat, authentication, image input, chat history, and a 
 
 ## 🚀 Live Demo
 
-👉 https://https://nexora-ai-kappa-topaz.vercel.app
+👉 https://nexora-ai-kappa-topaz.vercel.app
 
 ---
 
