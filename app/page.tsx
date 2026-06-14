@@ -383,12 +383,6 @@ export default function Home() {
   }
   return (
     <div className="flex h-screen bg-[#212121] text-white overflow-hidden">
-      <button
-        className="md:hidden text-white p-3"
-        onClick={() => setIsSidebarOpen(false)}
-      >
-        ✕
-      </button>
       {/* Sidebar */}
       <div
         className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300
