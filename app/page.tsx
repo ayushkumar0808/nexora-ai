@@ -492,15 +492,15 @@ export default function Home() {
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-[#0A0A0A]">
         <div className="border-b border-gray-700 px-6 py-4">
           <h1 className="text-xl font-semibold">
+            <button
+              className="md:hidden text-white text-2xl"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              ☰
+            </button>
             Nexora😎
           </h1>
         </div>
-        <button
-          className="md:hidden text-white text-2xl"
-          onClick={() => setIsSidebarOpen(true)}
-        >
-          ☰
-        </button>
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto w-full max-w-3xl space-y-6">
