@@ -7,7 +7,7 @@ It supports real-time AI chat, authentication, image input, chat history, and a 
 
 ## 🚀 Live Demo
 
-👉 https://your-vercel-link.vercel.app
+👉 https://https://nexora-ai-kappa-topaz.vercel.app
 
 ---
 
@@ -51,11 +51,10 @@ lib/
 ## ⚙️ Installation & Setup
 
 ### 1️. Clone Repository
-```
--git clone https://github.com/your-username/nexora-ai.git
-cd nexora-ai
 
-```
+-git clone https://github.com/ayushkumar0808/nexora-ai.git
+ cd nexora-ai
+
 ### 2. Install Dependencies
 ```
 npm install
