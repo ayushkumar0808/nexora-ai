@@ -7,6 +7,8 @@ import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { User } from "firebase/auth";
+import { collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type Message = {
   role: "user" | "assistant";
@@ -17,6 +19,7 @@ type Chat = {
   id: string;
   title: string;
   messages: Message[];
+  createdAt?: number;
 }
 
 export default function Home() {
@@ -56,6 +59,7 @@ export default function Home() {
       const newChat: Chat = {
         id: Date.now().toString(),
         title: "New Chat",
+        createdAt: Date.now(),
         messages: [
           {
             role: "assistant",
@@ -84,23 +88,56 @@ export default function Home() {
   }, [chats, isTyping]);
 
   useEffect(() => {
-    const savedChats = localStorage.getItem("nexora_chats");
+    if (!user) return;
 
-    if (savedChats) {
-      const parsed = JSON.parse(savedChats);
-      setChats(parsed);
-      setActiveChatId(parsed[0]?.id || "");
-    }
-    else {
-      createNewChat();
-    }
-  }, []);
+    const loadChats = async () => {
+      try {
+        const q = query(
+          collection(db, "users", user.uid, "chats"),
+          orderBy("createdAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          createNewChat();
+          return;
+        }
+
+        const loaded = snapshot.docs.map((doc) => doc.data() as Chat);
+        setChats(loaded);
+        setActiveChatId(loaded[0]?.id || null);
+      } catch (err) {
+        console.error("Failed to load chats:", err);
+        createNewChat();
+      }
+    };
+
+    loadChats();
+  }, [user]);
+
+
+
 
   useEffect(() => {
-    if (chats.length > 0) {
-      localStorage.setItem("nexora_chats", JSON.stringify(chats));
-    }
-  }, [chats]);
+    if (!user || chats.length === 0) return;
+
+    const saveChats = async () => {
+      try {
+        for (const chat of chats) {
+          await setDoc(doc(db, "users", user.uid, "chats", chat.id), {
+            ...chat,
+            createdAt: chat.createdAt || Date.now(),
+          });
+        }
+      } catch (err) {
+        console.error("Failed to save chats:", err);
+      }
+    };
+
+    saveChats();
+  }, [chats, user]);
+
+
 
   useEffect(() => {
     return () => {
@@ -229,6 +266,9 @@ export default function Home() {
 
   const deleteChat = (id: string) => {
     setChats((prev) => {
+      if (user) {
+        deleteDoc(doc(db, "users", user.uid, "chats", id)).catch(console.error);
+      }
       const updated = prev.filter((chat) => chat.id !== id);
 
       if (updated.length === 0) {
@@ -238,7 +278,7 @@ export default function Home() {
           messages: [
             {
               role: "assistant",
-              content: "Hi buddy! 👋 I'm Nexora.",
+              content: "Hi buddy!👋 I'm Nexora. How can I help you today?",
             },
           ],
         };
@@ -575,6 +615,26 @@ export default function Home() {
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {/* Welcome screen for new chat */}
+            {activeChat?.messages.length === 1 && (
+              <div className="flex flex-col items-center justify-center mt-20 text-center px-4">
+                <div className="text-5xl mb-4">😎</div>
+                <h2 className="text-xl font-semibold text-white mb-2">How can I help you?</h2>
+                <p className="text-gray-500 text-sm">Ask me anything — code, questions, ideas.</p>
+                <div className="mt-6 grid grid-cols-2 gap-2 w-full max-w-sm">
+                  {["Write a poem 🎵", "Explain AI 🤖", "Debug my code 💻", "Tell a joke 😄"].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      onClick={() => setInput(suggestion)}
+                      className="text-xs bg-gray-800 hover:bg-gray-700 border border-white/10 rounded-xl px-3 py-2 text-gray-300 transition text-left"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {isTyping && (
               <div className="flex items-center gap-3 text-gray-400">

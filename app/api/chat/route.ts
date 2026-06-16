@@ -12,6 +12,7 @@ export async function POST(req: Request) {
 
     if (history && history.length > 0) {
       for (const msg of history) {
+
         if (msg.content === "Hi buddy!👋 I'm Nexora. How can I help you today?") continue;
 
         contents.push({
