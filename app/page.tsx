@@ -1,12 +1,12 @@
 "use client";
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { User } from "firebase/auth";
 
 type Message = {
   role: "user" | "assistant";
@@ -17,7 +17,7 @@ type Chat = {
   id: string;
   title: string;
   messages: Message[];
-};
+}
 
 export default function Home() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -30,6 +30,8 @@ export default function Home() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const stopStreamingRef = useRef(false);
+
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
 
   const [editTitle, setEditTitle] = useState("");
@@ -40,7 +42,7 @@ export default function Home() {
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -66,6 +68,9 @@ export default function Home() {
       setChats(parsed);
       setActiveChatId(parsed[0]?.id || "");
     }
+    else {
+      createNewChat();
+    }
   }, []);
 
   useEffect(() => {
@@ -75,10 +80,12 @@ export default function Home() {
   }, [chats]);
 
   useEffect(() => {
-    if (chats.length === 0) {
-      createNewChat();
-    }
-  }, []);
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const playSound = (soundType: "send" | "receive") => {
     const audio = new Audio(
@@ -111,59 +118,54 @@ export default function Home() {
     setEditTitle(chat.title);
   };
 
+  const [copySuccess, setCopySuccess] = useState<number | null>(null);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, index: number) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert("Copied!");
+      setCopySuccess(index);
+      setTimeout(() => setCopySuccess(null), 2000);
     } catch {
-      alert("Failed to copy.");
+      console.error("Failed to copy.");
     }
   };
 
-  const streamResponse = async (fullText: string) => {
+  const streamResponse = useCallback(async (fullText: string, chatId: string) => {
     let currentText = "";
+    stopStreamingRef.current = false;
 
-    // add empty assistant message first
     setChats((prev) =>
       prev.map((chat) =>
-        chat.id === activeChatId
-          ? {
-            ...chat,
-            messages: [
-              ...chat.messages,
-              { role: "assistant", content: "" },
-            ],
-          }
+        chat.id === chatId
+          ? { ...chat, messages: [...chat.messages, { role: "assistant", content: "" }] }
           : chat
       )
     );
 
     for (let i = 0; i < fullText.length; i++) {
+      if (stopStreamingRef.current) break;
+
       currentText += fullText[i];
 
       setChats((prev) =>
         prev.map((chat) => {
-          if (chat.id !== activeChatId) return chat;
-
+          if (chat.id !== chatId) return chat;
           const updatedMessages = [...chat.messages];
-
           updatedMessages[updatedMessages.length - 1] = {
             role: "assistant",
             content: currentText,
           };
-
-          return {
-            ...chat,
-            messages: updatedMessages,
-          };
+          return { ...chat, messages: updatedMessages };
         })
       );
 
-      // speed control (typing feel)
-      await new Promise((res) => setTimeout(res, 15));
+      if (i % 3 === 0) {
+        await new Promise((res) => setTimeout(res, 0));
+      }
     }
-  };
+
+    setIsTyping(false);
+  }, []);
 
   const updateChatTitle = (id: string, title: string) => {
     setChats((prev) =>
@@ -230,10 +232,10 @@ export default function Home() {
     });
   };
 
-  const handleSend = async () => {
-    playSound("send");
-    if (!input.trim()) return;
 
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    playSound("send");
     const userMessage = input;
     setChats((prev) =>
       prev.map((chat) =>
@@ -274,15 +276,16 @@ export default function Home() {
         },
         body: JSON.stringify({
           message: userMessage,
+          history: activeChat?.messages || [],
           image: base64Image,
         }),
       });
 
       const data = await response.json();
-
-      await streamResponse(data.reply);
+      await streamResponse(data.reply, activeChatId!);
       playSound("receive");
-    } catch {
+    }
+    catch {
       setChats((prev) =>
         prev.map((chat) =>
           chat.id === activeChatId
@@ -304,6 +307,7 @@ export default function Home() {
 
     setIsTyping(false);
   };
+
 
   const createNewChat = () => {
     const newChat: Chat = {
@@ -359,7 +363,7 @@ export default function Home() {
               Your intelligent chat companion
             </p>
             <p className="text-center text-xs text-gray-400 mt-6">
-              Created by AYUSH
+              Built with ❤️ by Ayush Kumar
             </p>
           </div>
 
@@ -396,17 +400,18 @@ export default function Home() {
     <div className="flex h-screen text-white bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f]">
       {/* Sidebar */}
       <div
-        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300
+        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300 flex flex-col
   ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-        <div className="p-4">
+        {/* Top: New Chat + Search */}
+        <div className="p-4 shrink-0">
           <button
             onClick={createNewChat}
             className="w-full rounded-lg bg-white text-black px-4 py-2 font-medium hover:opacity-90 transition"
           >
             + New Chat
           </button>
-          <div className="p-2">
+          <div className="pt-2">
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -415,21 +420,19 @@ export default function Home() {
             />
           </div>
         </div>
-        <div className="flex-1 p-2 overflow-y-auto">
-          {filteredChats.map((chat) => (
 
+        {/* Middle: Scrollable chat list */}
+        <div className="flex-1 overflow-y-auto px-2">
+          {filteredChats.map((chat) => (
             <div
               key={chat.id}
               onClick={() => {
                 setActiveChatId(chat.id);
                 setIsSidebarOpen(false);
               }}
-              className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition ${chat.id === activeChatId
-                ? "bg-gray-800"
-                : "hover:bg-gray-800/60"
+              className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition ${chat.id === activeChatId ? "bg-gray-800" : "hover:bg-gray-800/60"
                 }`}
             >
-              {/* Chat title */}
               {editingChatId === chat.id ? (
                 <input
                   value={editTitle}
@@ -437,9 +440,7 @@ export default function Home() {
                   onChange={(e) => setEditTitle(e.target.value)}
                   onBlur={() => handleRename(chat.id)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleRename(chat.id);
-                    }
+                    if (e.key === "Enter") handleRename(chat.id);
                   }}
                   className="bg-gray-700 text-white text-sm px-2 py-1 rounded w-full mr-2"
                 />
@@ -451,8 +452,6 @@ export default function Home() {
                   {chat.title}
                 </span>
               )}
-
-              {/* Delete button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -466,29 +465,23 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="border-t border-gray-700 p-4 text-sm text-gray-500">
-          Nexora
-        </div>
-        <div className="flex items-center gap-3">
-
-          {user?.photoURL && (
-            <img
-              src={user.photoURL}
-              className="w-8 h-8 rounded-full"
-            />
-          )}
-
-          <span className="text-sm text-gray-300">
-            {user?.displayName}
-          </span>
-
-          <button
-            onClick={logout}
-            className="text-xs text-red-400 hover:text-red-300"
-          >
-            Logout
-          </button>
-
+        {/* Bottom: User info - always visible */}
+        <div className="shrink-0 border-t border-gray-700 p-4">
+          <p className="text-xs text-gray-500 mb-3">Nexora</p>
+          <div className="flex items-center gap-3">
+            {user?.photoURL && (
+              <img src={user.photoURL} className="w-8 h-8 rounded-full" />
+            )}
+            <span className="text-sm text-gray-300 truncate flex-1">
+              {user?.displayName}
+            </span>
+            <button
+              onClick={logout}
+              className="text-xs text-red-400 hover:text-red-300 shrink-0"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
@@ -498,21 +491,21 @@ export default function Home() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-
       {/* Main Chat */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 bg-[#0A0A0A]">
-        <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between backdrop-blur-xl bg-white/5">
+      <div className="flex-1 flex flex-col bg-[#0A0A0A] min-w-0">
+
+        {/* Fixed Header */}
+        <div className="shrink-0 border-b border-white/10 px-6 py-4 flex items-center justify-between backdrop-blur-xl bg-[#0A0A0A]">
           <button
             className="md:hidden text-white text-2xl"
             onClick={() => setIsSidebarOpen(true)}
           >
             ☰
           </button>
-          <h1 className="text-xl font-semibold">
-            Nexora😎
-          </h1>
+          <h1 className="text-xl font-semibold">Nexora😎</h1>
         </div>
 
+        {/* Scrollable Messages ONLY */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto w-full max-w-3xl space-y-6">
             <AnimatePresence>
@@ -542,12 +535,8 @@ export default function Home() {
                           components={{
                             code({ className, children }) {
                               const match = /language-(\w+)/.exec(className || "");
-
                               return match ? (
-                                <SyntaxHighlighter
-                                  language={match[1]}
-                                  style={oneDark}
-                                >
+                                <SyntaxHighlighter language={match[1]} style={oneDark}>
                                   {String(children).replace(/\n$/, "")}
                                 </SyntaxHighlighter>
                               ) : (
@@ -560,18 +549,15 @@ export default function Home() {
                         >
                           {message.content}
                         </ReactMarkdown>
-
                         <button
-                          onClick={() => copyToClipboard(message.content)}
-                          className="mt-2 rounded bg-gray-700 px-3 py-1 text-sm hover:bg-gray-600"
+                          onClick={() => copyToClipboard(message.content, index)}
+                          className="mt-2 rounded bg-gray-700 px-3 py-1 text-sm hover:bg-gray-600 transition"
                         >
-                          Copy
+                          {copySuccess === index ? "✓ Copied!" : "Copy"}
                         </button>
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap">
-                        {message.content}
-                      </p>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
                     )}
                   </div>
                 </motion.div>
@@ -579,24 +565,20 @@ export default function Home() {
             </AnimatePresence>
 
             {isTyping && (
-              <div className="text-gray-400">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <div className="animate-bounce">●</div>
-                  <div
-                    className="animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  >
-                    ●
-                  </div>
-                  <div
-                    className="animate-bounce"
-                    style={{ animationDelay: "0.4s" }}
-                  >
-                    ●
-                  </div>
-
-                  <span>Nexora is thinking...</span>
-                </div>
+              <div className="flex items-center gap-3 text-gray-400">
+                <div className="animate-bounce">●</div>
+                <div className="animate-bounce" style={{ animationDelay: "0.2s" }}>●</div>
+                <div className="animate-bounce" style={{ animationDelay: "0.4s" }}>●</div>
+                <span>Nexora is thinking...</span>
+                <button
+                  onClick={() => {
+                    stopStreamingRef.current = true;
+                    setTimeout(() => setIsTyping(false), 50);
+                  }}
+                  className="ml-2 text-xs text-red-400 hover:text-red-300 border border-red-400/30 px-2 py-1 rounded-lg transition"
+                >
+                  ⏹ Stop
+                </button>
               </div>
             )}
 
@@ -604,53 +586,62 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="sticky bottom-0 border-t border-white/10 bg-[#0A0A0A] p-4">
-          <div className="mx-auto flex max-w-3xl gap-3">
-            <label className="cursor-pointer text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 text-xl">
-              🔗
+        {/* Fixed Input Bar */}
+        <div className="shrink-0 border-t border-white/10 bg-[#0A0A0A] p-4">
+          <div className="mx-auto w-full max-w-3xl">
 
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) =>
-                  handleImageUpload(e.target.files?.[0] || null)
-                }
-              />
-            </label>
             {imagePreview && (
-              <div className="mb-2">
+              <div className="mb-2 flex items-center gap-2">
                 <img
                   src={imagePreview}
                   alt="preview"
-                  className="h-24 rounded-lg border border-gray-600"
+                  className="h-20 rounded-lg border border-gray-600"
                 />
+                <button
+                  onClick={() => { setImage(null); setImagePreview(null); }}
+                  className="text-gray-400 hover:text-red-400 text-xs"
+                >
+                  ✕ Remove
+                </button>
               </div>
             )}
 
-            <input
-              value={input}
+            <div className="flex gap-3">
+              <label className="cursor-pointer text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 text-xl">
+                🔗
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => handleImageUpload(e.target.files?.[0] || null)}
+                />
+              </label>
 
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleSend();
-                }
-              }}
-              placeholder="Message Nexora..."
-              className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition"
-            />
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Message Nexora..."
+                className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition"
+              />
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSend}
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-white font-medium"
-            >
-              Send
-            </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleSend}
+                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-white font-medium"
+              >
+                Send
+              </motion.button>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   );

@@ -118,7 +118,7 @@ Upload images and ask AI questions about them.
 
 ## 👨‍💻 Author
 
-Built with ❤️ by Nexora AI Developer
+Built with ❤️ by Ayush Kumar
 
 ## 📜 License
 
