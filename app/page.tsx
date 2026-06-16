@@ -49,6 +49,10 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
 
   const createNewChat = () => {
     setChats((prev) => {
@@ -481,6 +485,19 @@ export default function Home() {
                 setActiveChatId(chat.id);
                 setIsSidebarOpen(false);
               }}
+
+              onTouchStart={() => {
+                pressTimer.current = setTimeout(() => {
+                  setSelectedChat(chat);
+                }, 500);
+              }}
+
+              onTouchEnd={() => {
+                if (pressTimer.current) {
+                  clearTimeout(pressTimer.current);
+                }
+              }}
+
               className={`group flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer transition ${chat.id === activeChatId ? "bg-gray-800" : "hover:bg-gray-800/60"
                 }`}
             >
@@ -721,8 +738,40 @@ export default function Home() {
             </div>
           </div>
         </div>
-
       </div>
+      {selectedChat && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50 md:hidden">
+          <div className="w-full rounded-t-2xl bg-[#2F2F2F] p-4">
+            <button
+              onClick={() => {
+                startEditing(selectedChat);
+                setSelectedChat(null);
+              }}
+              className="w-full rounded-lg px-4 py-3 text-left hover:bg-gray-700"
+            >
+              ✏️ Rename
+            </button>
+
+            <button
+              onClick={() => {
+                deleteChat(selectedChat.id);
+                setSelectedChat(null);
+              }}
+              className="mt-2 w-full rounded-lg px-4 py-3 text-left text-red-400 hover:bg-gray-700"
+            >
+              🗑️ Delete
+            </button>
+
+            <button
+              onClick={() => setSelectedChat(null)}
+              className="mt-2 w-full rounded-lg px-4 py-3 hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
+
 }
