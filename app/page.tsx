@@ -405,8 +405,9 @@ export default function Home() {
     <div className="flex h-screen text-white bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f]">
       {/* Sidebar */}
       <div
-        className={`fixed md:static top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300 flex flex-col
-  ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        className={`fixed top-0 left-0 h-full w-64 bg-[#171717] border-r border-gray-700 z-50 transform transition-transform duration-300 flex flex-col
+  md:static md:translate-x-0
+  ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Top: New Chat + Search */}
         <div className="p-4 shrink-0">
@@ -492,7 +493,7 @@ export default function Home() {
 
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
