@@ -46,6 +46,29 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+
+  const createNewChat = () => {
+    setChats((prev) => {
+      const cleaned = prev.filter(
+        (chat) => chat.title !== "New Chat" || chat.messages.length > 1
+      );
+
+      const newChat: Chat = {
+        id: Date.now().toString(),
+        title: "New Chat",
+        messages: [
+          {
+            role: "assistant",
+            content: "Hi buddy!👋 I'm Nexora. How can I help you today?",
+          },
+        ],
+      };
+
+      setActiveChatId(newChat.id);
+      return [newChat, ...cleaned];
+    });
+  };
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -107,7 +130,7 @@ export default function Home() {
   const logout = async () => {
     try {
       await signOut(auth);
-      setUser(null); // important UI reset
+      setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -308,24 +331,6 @@ export default function Home() {
     setIsTyping(false);
   };
 
-
-  const createNewChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: "New Chat",
-      messages: [
-        {
-          role: "assistant",
-          content: "Hi buddy!👋 I'm Nexora. How can I help you today?",
-        },
-      ],
-    };
-
-    setChats((prev) => [newChat, ...prev]);
-
-    setActiveChatId(newChat.id);
-  };
-
   const activeChat =
     chats.find((chat) => chat.id === activeChatId) || chats[0];
 
@@ -430,7 +435,7 @@ export default function Home() {
                 setActiveChatId(chat.id);
                 setIsSidebarOpen(false);
               }}
-              className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition ${chat.id === activeChatId ? "bg-gray-800" : "hover:bg-gray-800/60"
+              className={`group flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer transition ${chat.id === activeChatId ? "bg-gray-800" : "hover:bg-gray-800/60"
                 }`}
             >
               {editingChatId === chat.id ? (
@@ -447,7 +452,7 @@ export default function Home() {
               ) : (
                 <span
                   onDoubleClick={() => startEditing(chat)}
-                  className="truncate text-sm flex-1 cursor-pointer"
+                  className="truncate text-sm flex-1 cursor-pointer text-gray-200"
                 >
                   {chat.title}
                 </span>
@@ -507,7 +512,7 @@ export default function Home() {
 
         {/* Scrollable Messages ONLY */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="mx-auto w-full max-w-3xl space-y-6">
+          <div className="mx-auto w-full max-w-3xl space-y-3">
             <AnimatePresence>
               {activeChat?.messages.map((message, index) => (
                 <motion.div
@@ -520,7 +525,7 @@ export default function Home() {
                     }`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${message.role === "user"
+                    className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm ${message.role === "user"
                       ? "bg-white text-black ml-auto"
                       : "bg-[#1A1A1A] text-white border border-white/10"
                       }`}
@@ -536,7 +541,11 @@ export default function Home() {
                             code({ className, children }) {
                               const match = /language-(\w+)/.exec(className || "");
                               return match ? (
-                                <SyntaxHighlighter language={match[1]} style={oneDark}>
+                                <SyntaxHighlighter
+                                  language={match[1]}
+                                  style={oneDark}
+                                  customStyle={{ fontSize: "12px", borderRadius: "8px", overflowX: "auto", maxWidth: "100%" }}
+                                >
                                   {String(children).replace(/\n$/, "")}
                                 </SyntaxHighlighter>
                               ) : (
@@ -549,12 +558,14 @@ export default function Home() {
                         >
                           {message.content}
                         </ReactMarkdown>
-                        <button
-                          onClick={() => copyToClipboard(message.content, index)}
-                          className="mt-2 rounded bg-gray-700 px-3 py-1 text-sm hover:bg-gray-600 transition"
-                        >
-                          {copySuccess === index ? "✓ Copied!" : "Copy"}
-                        </button>
+                        {index > 0 && (
+                          <button
+                            onClick={() => copyToClipboard(message.content, index)}
+                            className="mt-2 rounded-lg bg-gray-700/60 border border-white/10 px-3 py-1 text-xs text-gray-300 hover:bg-gray-600 transition"
+                          >
+                            {copySuccess === index ? "✓ Copied!" : "Copy"}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{message.content}</p>
@@ -606,7 +617,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <label className="cursor-pointer text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 text-xl">
                 🔗
                 <input
@@ -629,12 +640,11 @@ export default function Home() {
                 placeholder="Message Nexora..."
                 className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition"
               />
-
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSend}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-white font-medium"
+                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-3 text-white font-medium"
               >
                 Send
               </motion.button>
