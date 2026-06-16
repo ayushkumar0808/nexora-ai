@@ -167,6 +167,10 @@ export default function Home() {
   const logout = async () => {
     try {
       await signOut(auth);
+
+      setChats([]);
+      setActiveChatId(null);
+
       setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
@@ -275,6 +279,7 @@ export default function Home() {
         const newChat: Chat = {
           id: Date.now().toString(),
           title: "New Chat",
+          createdAt: Date.now(),
           messages: [
             {
               role: "assistant",
@@ -516,7 +521,11 @@ export default function Home() {
           <p className="text-xs text-gray-500 mb-3">Nexora</p>
           <div className="flex items-center gap-3">
             {user?.photoURL && (
-              <img src={user.photoURL} className="w-8 h-8 rounded-full" />
+              <img
+                src={user?.photoURL || "/default-avatar.png"}
+                alt="Profile"
+                className="w-8 h-8 rounded-full"
+              />
             )}
             <span className="text-sm text-gray-300 truncate flex-1">
               {user?.displayName}
