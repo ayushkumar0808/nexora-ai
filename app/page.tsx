@@ -10,6 +10,37 @@ import { User } from "firebase/auth";
 import { collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative my-2">
+      <div className="flex items-center justify-between bg-gray-700 px-3 py-1 rounded-t-lg">
+        <span className="text-xs text-gray-400">{language}</span>
+        <button
+          onClick={handleCopy}
+          className="text-xs text-gray-300 hover:text-white transition"
+        >
+          {copied ? "✓ Copied!" : "Copy"}
+        </button>
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        customStyle={{ fontSize: "12px", borderRadius: "0 0 8px 8px", overflowX: "auto", maxWidth: "100%", margin: 0 }}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -121,11 +152,10 @@ export default function Home() {
 
 
 
-
   useEffect(() => {
     if (!user || chats.length === 0) return;
 
-    const saveChats = async () => {
+    const timer = setTimeout(async () => {
       try {
         for (const chat of chats) {
           await setDoc(doc(db, "users", user.uid, "chats", chat.id), {
@@ -136,9 +166,9 @@ export default function Home() {
       } catch (err) {
         console.error("Failed to save chats:", err);
       }
-    };
+    }, 3000);
 
-    saveChats();
+    return () => clearTimeout(timer); // cleanup
   }, [chats, user]);
 
 
@@ -272,11 +302,17 @@ export default function Home() {
     });
   };
 
-  const deleteChat = (id: string) => {
-    setChats((prev) => {
-      if (user) {
-        deleteDoc(doc(db, "users", user.uid, "chats", id)).catch(console.error);
+  const deleteChat = async (id: string) => {
+    // Pehle Firestore se delete karo
+    if (user) {
+      try {
+        await deleteDoc(doc(db, "users", user.uid, "chats", id));
+      } catch (err) {
+        console.error("Delete failed:", err);
       }
+    }
+
+    setChats((prev) => {
       const updated = prev.filter((chat) => chat.id !== id);
 
       if (updated.length === 0) {
@@ -291,7 +327,6 @@ export default function Home() {
             },
           ],
         };
-
         setActiveChatId(newChat.id);
         return [newChat];
       }
@@ -608,13 +643,7 @@ export default function Home() {
                             code({ className, children }) {
                               const match = /language-(\w+)/.exec(className || "");
                               return match ? (
-                                <SyntaxHighlighter
-                                  language={match[1]}
-                                  style={oneDark}
-                                  customStyle={{ fontSize: "12px", borderRadius: "8px", overflowX: "auto", maxWidth: "100%" }}
-                                >
-                                  {String(children).replace(/\n$/, "")}
-                                </SyntaxHighlighter>
+                                <CodeBlock language={match[1]} code={String(children).replace(/\n$/, "")} />
                               ) : (
                                 <code className="bg-gray-800 rounded px-1">
                                   {children}
@@ -715,7 +744,7 @@ export default function Home() {
                 />
               </label>
 
-              <input
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -725,7 +754,8 @@ export default function Home() {
                   }
                 }}
                 placeholder="Message Nexora..."
-                className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition"
+                rows={1}
+                className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition resize-none max-h-32"
               />
               <motion.button
                 whileHover={{ scale: 1.05 }}
