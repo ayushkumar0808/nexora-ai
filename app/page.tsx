@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, signOut } from "firebase/auth";
+import { signInWithPopup, signOut, signInAnonymously } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { User } from "firebase/auth";
 import { collection, doc, setDoc, getDocs, deleteDoc, query, orderBy } from "firebase/firestore";
@@ -219,12 +219,18 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
 
+    if (user.isAnonymous) {
+      createNewChat();
+      return;
+    }
+
     const loadChats = async () => {
       try {
         const q = query(
           collection(db, "users", user.uid, "chats"),
           orderBy("createdAt", "desc")
         );
+
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
@@ -232,7 +238,10 @@ export default function Home() {
           return;
         }
 
-        const loaded = snapshot.docs.map((doc) => doc.data() as Chat);
+        const loaded = snapshot.docs.map(
+          (doc) => doc.data() as Chat
+        );
+
         setChats(loaded);
         setActiveChatId(loaded[0]?.id || null);
       } catch (err) {
@@ -247,7 +256,7 @@ export default function Home() {
 
 
   useEffect(() => {
-    if (!user || chats.length === 0) return;
+    if (!user || user.isAnonymous || chats.length === 0) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -302,6 +311,14 @@ export default function Home() {
       setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -522,15 +539,15 @@ export default function Home() {
         <div className="absolute w-72 h-72 bg-blue-500/20 rounded-full blur-3xl bottom-10 right-10 animate-pulse"></div>
 
         {/* Glass Card */}
-        <div className="relative z-10 w-[380px] p-8 rounded-2xl 
-        bg-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl">
+        <div className="relative z-10 w-[400px] p-8 rounded-3xl bg-white/5 backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.25)]">
 
           {/* Title */}
           <div className="text-center mb-6">
-            <h1 className="text-4xl font-bold text-white tracking-tight">
-              Nexora😎
+            <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              Nexora
             </h1>
-            <p className="text-sm text-gray-300 mt-2">
+            <p className="text-lg mt-2">😎</p>
+            <p className="text-sm text-gray-300 mt-3">
               Your intelligent chat companion
             </p>
             <p className="text-center text-xs text-gray-400 mt-6">
@@ -550,12 +567,16 @@ export default function Home() {
           {/* Login Button */}
           <button
             onClick={loginWithGoogle}
-            className="w-full flex items-center justify-center gap-3 
-          bg-white text-black py-3 rounded-xl font-semibold
-          hover:scale-[1.03] transition duration-200 shadow-lg"
+            className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-xl font-semibold hover:scale-105 transition-all duration-300 shadow-lg"
           >
-            <span className="text-lg"></span>
+            <span>🔐</span>
             Continue with Google
+          </button>
+          <button
+            onClick={handleGuestLogin}
+            className="mt-3 w-full rounded-xl border border-white/10  bg-white/5 py-3 font-medium text-gray-200 hover:bg-white/10 transition-all duration-300"
+          >
+            👤 Continue as Guest
           </button>
 
           {/* Footer */}
