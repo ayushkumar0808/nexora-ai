@@ -41,6 +41,100 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   );
 }
 
+function ChatInput({ onSend, prefill }: { onSend: (text: string, image: File | null, imagePreview: string | null) => void; prefill?: string }) {
+  const [localInput, setLocalInput] = useState("");
+  useEffect(() => {
+    if (prefill) {
+      setLocalInput(prefill);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + "px";
+        textareaRef.current.focus();
+      }
+    }
+  }, [prefill]);
+  const [localImage, setLocalImage] = useState<File | null>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleImageUpload = (file: File | null) => {
+    if (!file) return;
+    setLocalImage(file);
+    setLocalPreview(URL.createObjectURL(file));
+  };
+
+  const handleSubmit = () => {
+    if (!localInput.trim()) return;
+    onSend(localInput, localImage, localPreview);
+    setLocalInput("");
+    setLocalImage(null);
+    setLocalPreview(null);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  return (
+    <div className="shrink-0 border-t border-white/10 bg-[#0A0A0A] p-3 md:p-4">
+      <div className="mx-auto w-full max-w-3xl">
+        {localPreview && (
+          <div className="mb-2 flex items-center gap-2">
+            <img src={localPreview} alt="preview" className="h-20 rounded-lg border border-gray-600" />
+            <button
+              onClick={() => { setLocalImage(null); setLocalPreview(null); }}
+              className="text-gray-400 hover:text-red-400 text-xs"
+            >
+              ✕ Remove
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2 bg-[#171717] border border-white/10 rounded-3xl px-2 py-2 focus-within:border-white/30 transition">
+          <label className="shrink-0 cursor-pointer text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+            <input type="file" accept="image/*" hidden onChange={(e) => handleImageUpload(e.target.files?.[0] || null)} />
+          </label>
+
+          <textarea
+            ref={textareaRef}
+            value={localInput}
+            onChange={(e) => {
+              setLocalInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 150) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Message Nexora..."
+            rows={1}
+            style={{ resize: "none" }}
+            className="flex-1 bg-transparent text-white placeholder-gray-500 outline-none border-none py-2 text-sm leading-relaxed max-h-[150px] overflow-y-auto scrollbar-thumb-gray-600 scrollbar-track-transparent"
+          />
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSubmit}
+            disabled={!localInput.trim()}
+            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="19" x2="12" y2="5"></line>
+              <polyline points="5 12 12 5 19 12"></polyline>
+            </svg>
+          </motion.button>
+        </div>
+
+        <p className="text-center text-[10px] text-gray-600 mt-1.5">Built with ❤️ by Ayush Kumar</p>
+      </div>
+    </div>
+  );
+}
+
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -58,7 +152,9 @@ export default function Home() {
 
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
-  const [input, setInput] = useState("");
+  const [prefillText, setPrefillText] = useState("");
+
+  const [prefillKey, setPrefillKey] = useState(0);
 
   const [isTyping, setIsTyping] = useState(false);
 
@@ -72,9 +168,7 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [image, setImage] = useState<File | null>(null);
-
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview] = useState<string | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -273,13 +367,6 @@ export default function Home() {
     );
   };
 
-  const handleImageUpload = (file: File | null) => {
-    if (!file) return;
-
-    setImage(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
   const handleRename = (id: string) => {
     if (!editTitle.trim()) return;
 
@@ -340,11 +427,9 @@ export default function Home() {
   };
 
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    playSound("send");
-    const userMessage = input;
-    setChats((prev) =>
+  const handleSend = async (userMessage: string, sentImage: File | null) => {
+    if (!userMessage.trim()) return;
+    playSound("send"); setChats((prev) =>
       prev.map((chat) =>
         chat.id === activeChatId
           ? {
@@ -365,16 +450,13 @@ export default function Home() {
       )
     );
 
-    setInput("");
     setIsTyping(true);
-    setImage(null);
-    setImagePreview(null);
 
     try {
       let base64Image = null;
 
-      if (image) {
-        base64Image = await convertToBase64(image);
+      if (sentImage) {
+        base64Image = await convertToBase64(sentImage);
       }
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -472,7 +554,7 @@ export default function Home() {
           bg-white text-black py-3 rounded-xl font-semibold
           hover:scale-[1.03] transition duration-200 shadow-lg"
           >
-            <span className="text-lg">🔵</span>
+            <span className="text-lg"></span>
             Continue with Google
           </button>
 
@@ -681,7 +763,10 @@ export default function Home() {
                   {["Write a poem 🎵", "Explain AI 🤖", "Debug my code 💻", "Tell a joke 😄"].map((suggestion) => (
                     <button
                       key={suggestion}
-                      onClick={() => setInput(suggestion)}
+                      onClick={() => {
+                        setPrefillText(suggestion);
+                        setPrefillKey((k) => k + 1);
+                      }}
                       className="text-xs bg-gray-800 hover:bg-gray-700 border border-white/10 rounded-xl px-3 py-2 text-gray-300 transition text-left"
                     >
                       {suggestion}
@@ -713,61 +798,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Fixed Input Bar */}
-        <div className="shrink-0 border-t border-white/10 bg-[#0A0A0A] p-4">
-          <div className="mx-auto w-full max-w-3xl">
+        <ChatInput key={prefillKey} onSend={(text, img) => handleSend(text, img)} prefill={prefillText} />
 
-            {imagePreview && (
-              <div className="mb-2 flex items-center gap-2">
-                <img
-                  src={imagePreview}
-                  alt="preview"
-                  className="h-20 rounded-lg border border-gray-600"
-                />
-                <button
-                  onClick={() => { setImage(null); setImagePreview(null); }}
-                  className="text-gray-400 hover:text-red-400 text-xs"
-                >
-                  ✕ Remove
-                </button>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <label className="cursor-pointer text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 text-xl">
-                🔗
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => handleImageUpload(e.target.files?.[0] || null)}
-                />
-              </label>
-
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Message Nexora..."
-                rows={1}
-                className="flex-1 rounded-xl bg-[#111111] border border-white/10 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-white/30 transition resize-none max-h-32"
-              />
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleSend}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-3 text-white font-medium"
-              >
-                Send
-              </motion.button>
-            </div>
-          </div>
-        </div>
       </div>
       {selectedChat && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/50 md:hidden">

@@ -24,3 +24,27 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom thin scrollbar for textarea and other elements */
+textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 10px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+}
+
+/* Firefox support */
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 transparent;
+}
